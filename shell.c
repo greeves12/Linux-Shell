@@ -7,6 +7,7 @@ void clearBuffer(char str[]);
 void print_out(char str[]);
 void remove_enter(char str[]);
 void remove_spaces(char str[], char *argv[]);
+void doExit(char str[]);
 
 int main(){
     char str[256];
@@ -23,9 +24,10 @@ int main(){
 	
 	if(pid == 0){
 	    remove_enter(str);
+	    doExit(str);
 	    remove_spaces(str,argv);
-
-	    //    execvp(argv[0], argv);
+	    
+            execvp(argv[0], argv);
 	}
 	
 	clearBuffer(str);
@@ -66,9 +68,30 @@ void remove_enter(char str[]){
     str[i] = '\0';
 }
 
+void doExit(char str[]){
+    int flag = 0;
+    int index = 0;
+    char exitStr[] = {"exit"};
+    
+    while(str[index] != '\0' && exitStr[index] != '\0'){
+	if(str[index] != exitStr[index]){
+	    flag = 1;
+	    break;
+	}
+	index++;
+    }
+    printf("%d",flag);
+    
+    if(flag == 0){
+	_exit(0);
+    }
+
+}
+
 void remove_spaces(char str[], char *argv[]){
     int arguments = 0;
     int index = 0;
+    int argIndex = 0;
     
     while(str[index] != '\0'){
 	if(str[index] == ' '){
@@ -77,7 +100,36 @@ void remove_spaces(char str[], char *argv[]){
 	index++;
     }
 
-    printf("%d",arguments);
+    arguments++;
+
+    index = 0;
+
+    for(index = 0; index < arguments; index++){
+	argv[index] = malloc(200);
+    }
+    
+    argv[arguments] = NULL;
+
+    arguments = 0;
+    index = 0;
+
+    while(str[index] != '\0'){
+	if(str[index] == ' '){
+	    argv[arguments][argIndex] = '\0';
+	    arguments++;
+	    argIndex = 0;
+	    index++;
+	}
+	
+	argv[arguments][argIndex] = str[index];
+	index++;
+	argIndex++;
+    }
+
+//    print_out(argv[0]);
+//    print_out(argv[1]);
+    
+//    printf("%d",arguments);
     
 /*    argv[0] = malloc(10);
     argv[1] = malloc(10);
