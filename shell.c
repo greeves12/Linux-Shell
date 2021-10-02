@@ -14,20 +14,21 @@ int main(){
     pid_t pid;
     int status;
     char *argv[10] = {};
-
-    clearBuffer(str);
     
     while(1){
+	clearBuffer(str);
 	printf("mysh$ ");
 	fgets(str, 256,stdin);
+	doExit(str);
 	pid = fork();
 	
 	if(pid == 0){
 	    remove_enter(str);
-	    doExit(str);
 	    remove_spaces(str,argv);
 	    
-            execvp(argv[0], argv);
+            if(execvp(argv[0], argv) < 0){
+		printf("Unknown command\n");
+	    }
 	}
 	
 	clearBuffer(str);
@@ -80,7 +81,6 @@ void doExit(char str[]){
 	}
 	index++;
     }
-    printf("%d",flag);
     
     if(flag == 0){
 	_exit(0);
