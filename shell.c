@@ -150,4 +150,6 @@ void remove_spaces(char str[], char *argv[]){
     argv[2] = NULL;
 
     */
+
+
 }
