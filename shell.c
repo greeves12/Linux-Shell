@@ -8,6 +8,7 @@ void print_out(char str[]);
 void remove_enter(char str[]);
 void remove_spaces(char str[], char *argv[]);
 void doExit(char str[]);
+void cleanUp(char *argv[]);
 
 int main(){
     char str[256];
@@ -28,11 +29,11 @@ int main(){
 	    
             if(execvp(argv[0], argv) < 0){
 		printf("Unknown command\n");
+		_exit(1);
 	    }
+	    cleanUp(argv);
 	}
 	
-	clearBuffer(str);
-
 	waitpid(pid, &status,0);
     }
 
@@ -46,6 +47,15 @@ void clearBuffer(char str[]){
 	str[index] = '\0';
     }
    
+}
+
+void cleanUp(char *arg[]){
+    int index = 0;
+
+    while(arg[index] != NULL){
+	free(arg[index]);
+	index++;
+    }
 }
 
 void print_out(char str[]){
