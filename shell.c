@@ -8,6 +8,7 @@ void print_out(char str[]);
 int remove_enter(char str[]);
 void remove_spaces(char str[], char *argv[]);
 void doExit(char str[]);
+void cleanUp(char *argv[]);
 
 int main(){
     char str[256];
@@ -15,27 +16,30 @@ int main(){
     int status;
     int bgFlag;
     char *argv[10] = {};
-
-    clearBuffer(str);
     
     while(1){
+	clearBuffer(str);
 	printf("mysh$ ");
 	fgets(str, 256,stdin);
 	bgFlag = remove_enter(str);	
-
+	doExit(str);
+	
 	pid = fork();
 	if(pid == 0){
-	    doExit(str);
 	    remove_spaces(str,argv);
+	  
+            if(execvp(argv[0], argv) < 0){
+		printf("Unknown command\n");
+		_exit(1);
+	    }
 	    
-            execvp(argv[0], argv);
+	    cleanUp(argv);
 	}
 	
 	clearBuffer(str);
 	if(!bgFlag){
 	    waitpid(pid, &status,0);
 	}
-
     }
 
     return 0;
@@ -48,6 +52,15 @@ void clearBuffer(char str[]){
 	str[index] = '\0';
     }
    
+}
+
+void cleanUp(char *arg[]){
+    int index = 0;
+
+    while(arg[index] != NULL){
+	free(arg[index]);
+	index++;
+    }
 }
 
 void print_out(char str[]){
@@ -89,7 +102,6 @@ void doExit(char str[]){
 	}
 	index++;
     }
-    printf("%d",flag);
     
     if(flag == 0){
 	_exit(0);
