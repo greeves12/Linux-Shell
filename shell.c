@@ -5,7 +5,7 @@
 
 void clearBuffer(char str[]);
 void print_out(char str[]);
-void remove_enter(char str[]);
+int remove_enter(char str[]);
 void remove_spaces(char str[], char *argv[]);
 void doExit(char str[]);
 
@@ -13,6 +13,7 @@ int main(){
     char str[256];
     pid_t pid;
     int status;
+    int bgFlag;
     char *argv[10] = {};
 
     clearBuffer(str);
@@ -20,10 +21,10 @@ int main(){
     while(1){
 	printf("mysh$ ");
 	fgets(str, 256,stdin);
+	bgFlag = remove_enter(str);	
+
 	pid = fork();
-	
 	if(pid == 0){
-	    remove_enter(str);
 	    doExit(str);
 	    remove_spaces(str,argv);
 	    
@@ -31,8 +32,10 @@ int main(){
 	}
 	
 	clearBuffer(str);
+	if(!bgFlag){
+	    waitpid(pid, &status,0);
+	}
 
-	waitpid(pid, &status,0);
     }
 
     return 0;
@@ -58,14 +61,20 @@ void print_out(char str[]){
     printf("%d",i);
 }
 
-void remove_enter(char str[]){
+int remove_enter(char str[]){
     int i = 0;
-
-    while(str[i] != '\n'){
+    int flag = 0;
+    
+    while(str[i] != '\n' && str[i] != '&'){
 	i++;
+    
+    if (str[i] == '&'){
+	flag = 1;
     }
-
+    }	    
     str[i] = '\0';
+
+    return flag;
 }
 
 void doExit(char str[]){
