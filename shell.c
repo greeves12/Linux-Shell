@@ -13,6 +13,7 @@ void remove_spaces(char str[], char *argv[]);
 void doExit(char str[]);
 void cleanUp(char *argv[]);
 void split_pipe(char str[], char newStr[], int arg);
+void trim_str(char str[]);
 
 int main(){
     char str[256];
@@ -79,9 +80,13 @@ int main(){
 	    }
 
 	    close(pipefd[READ_END]);
-	    waitpid(pid, &status,0);
-	    waitpid(pid2,&status,0);
-	    
+
+	    if(bgFlag == 1){
+		waitpid(pid, &status,0);
+		waitpid(pid2,&status,0);
+	    }
+
+	    bgFlag = 1;
 	    pipeFlag = 1;
 	}
     }
@@ -98,6 +103,7 @@ void split_pipe(char str[], char newStr[], int arg){
 	    newStr[i] = str[i];
 	    i++;
 	}
+	trim_str(newStr);
     }else if(arg == 1){
 	while(str[i] != '|'){
 	    i++;
@@ -107,6 +113,36 @@ void split_pipe(char str[], char newStr[], int arg){
 	    newStr[x] = str[i];
 	    i++;
 	    x++;
+	}
+	trim_str(newStr);
+    }
+}
+
+void trim_str(char str[]){
+    int index = 0;
+    int x;
+    int i;
+    
+    while(str[index+1] != '\0'){
+	index++;
+    }
+
+    while(str[index] == ' '){
+	str[index] = '\0';
+	index--;
+    }
+
+    index = 0;
+
+    while(str[index] == ' '){
+	index++;
+    }
+    
+    for(x = 0; x < index; x++){
+	i = 0;
+	while(str[i] != '\0'){
+	    str[i-1] = str[i];
+	    i++;
 	}
     }
 }
