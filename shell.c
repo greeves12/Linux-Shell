@@ -5,7 +5,7 @@
 
 void clearBuffer(char str[]);
 void print_out(char str[]);
-int remove_enter(char str[]);
+void remove_enter(char str[], int *bgFlag);
 void remove_spaces(char str[], char *argv[]);
 void doExit(char str[]);
 void cleanUp(char *argv[]);
@@ -14,32 +14,31 @@ int main(){
     char str[256];
     pid_t pid;
     int status;
-    int bgFlag;
     char *argv[10] = {};
+    int bgFlag = 1;
     
     while(1){
 	clearBuffer(str);
 	printf("mysh$ ");
 	fgets(str, 256,stdin);
-	bgFlag = remove_enter(str);	
 	doExit(str);
-	
 	pid = fork();
+
+	remove_enter(str, &bgFlag);
+	
 	if(pid == 0){
 	    remove_spaces(str,argv);
-	  
+	    
             if(execvp(argv[0], argv) < 0){
 		printf("Unknown command\n");
 		_exit(1);
 	    }
-	    
 	    cleanUp(argv);
 	}
-	
-	clearBuffer(str);
-	if(!bgFlag){
+	if(bgFlag == 1){
 	    waitpid(pid, &status,0);
 	}
+	bgFlag = 1;
     }
 
     return 0;
@@ -74,20 +73,20 @@ void print_out(char str[]){
     printf("%d",i);
 }
 
-int remove_enter(char str[]){
+void remove_enter(char str[], int *bgFlag){
     int i = 0;
-    int flag = 0;
-    
-    while(str[i] != '\n' && str[i] != '&'){
-	i++;
-    
-    if (str[i] == '&'){
-	flag = 1;
-    }
-    }	    
-    str[i] = '\0';
 
-    return flag;
+    
+    while(str[i] != '\n'){
+	i++;
+    }
+
+    if(str[i-1] == '&'){
+	*bgFlag = 0;
+	str[i-1] = '\0';
+    }
+    
+    str[i] = '\0';
 }
 
 void doExit(char str[]){
@@ -159,17 +158,14 @@ void remove_spaces(char str[], char *argv[]){
     argv[0][1] = '\0';
     argv[1][0] = 't';
     argv[1][1] = '\0';
-
     print_out(argv[0]);
     print_out(argv[1]);
-
     free(argv[0]);
     free(argv[1]);*/
     /*
     argv[0] = "/bin/ls";
     argv[1] = "-al";
     argv[2] = NULL;
-
     */
 
 
