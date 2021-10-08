@@ -3,45 +3,112 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#define READ_END 0
+#define WRITE_END 1
+
 void clearBuffer(char str[]);
 void print_out(char str[]);
-void remove_enter(char str[], int *bgFlag);
+void remove_enter(char str[], int *bgFlag, int *pipeFlag);
 void remove_spaces(char str[], char *argv[]);
 void doExit(char str[]);
 void cleanUp(char *argv[]);
+void split_pipe(char str[], char newStr[], int arg);
 
 int main(){
     char str[256];
-    pid_t pid;
+    char pipeStr[256];
+    pid_t pid, pid2;
     int status;
     char *argv[10] = {};
     int bgFlag = 1;
+    int pipeFlag = 1;
+    int pipefd[2];
+
     
     while(1){
 	clearBuffer(str);
+	clearBuffer(pipeStr);
 	printf("mysh$ ");
 	fgets(str, 256,stdin);
 	doExit(str);
-	pid = fork();
 
-	remove_enter(str, &bgFlag);
-	
-	if(pid == 0){
-	    remove_spaces(str,argv);
+	remove_enter(str, &bgFlag, &pipeFlag);
+
+	if(pipeFlag == 1){
+	    pid = fork();
+	    if(pid == 0){
+		remove_spaces(str,argv);
 	    
-            if(execvp(argv[0], argv) < 0){
-		printf("Unknown command\n");
-		_exit(1);
+		if(execvp(argv[0], argv) < 0){
+		    printf("Unknown command\n");
+		    _exit(1);
+		}
+		cleanUp(argv);
 	    }
+	    if(bgFlag == 1){
+		waitpid(pid, &status,0);
+	    }
+
+	    bgFlag = 1;
+	}else{	    
+
+	    pipe(pipefd);
+
+	    pid = fork();
+
+	    if(pid == 0){
+		split_pipe(str, pipeStr, 0);
+		close(pipefd[READ_END]);
+		dup2(pipefd[WRITE_END], 1);
+		remove_spaces(pipeStr, argv);
+		execvp(argv[0], argv);	
+	    }
+
 	    cleanUp(argv);
-	}
-	if(bgFlag == 1){
+	    clearBuffer(pipeStr);
+	    close(pipefd[WRITE_END]);
+
+	    pid2 = fork();
+
+	    if(pid2 == 0){
+		split_pipe(str, pipeStr, 1);
+		close(pipefd[WRITE_END]);
+		dup2(pipefd[READ_END],0);
+		remove_spaces(pipeStr,argv);
+		execvp(argv[0],argv);
+	    }
+
+	    close(pipefd[READ_END]);
 	    waitpid(pid, &status,0);
+	    waitpid(pid2,&status,0);
+	    
+	    pipeFlag = 1;
 	}
-	bgFlag = 1;
     }
 
     return 0;
+}
+
+void split_pipe(char str[], char newStr[], int arg){
+    int i = 0;
+    int x = 0;
+    
+    if(arg == 0){
+	while(str[i] != '|'){
+	    newStr[i] = str[i];
+	    i++;
+	}
+    }else if(arg == 1){
+	while(str[i] != '|'){
+	    i++;
+	}
+	i++;
+	while(str[i] != '\0'){
+	    newStr[x] = str[i];
+	    i++;
+	    x++;
+	}
+    }
 }
 
 void clearBuffer(char str[]){
@@ -73,10 +140,9 @@ void print_out(char str[]){
     printf("%d",i);
 }
 
-void remove_enter(char str[], int *bgFlag){
+void remove_enter(char str[], int *bgFlag, int *pipeFlag){
     int i = 0;
 
-    
     while(str[i] != '\n'){
 	i++;
     }
@@ -87,6 +153,15 @@ void remove_enter(char str[], int *bgFlag){
     }
     
     str[i] = '\0';
+
+    i = 0;
+    while(str[i] != '\0'){
+	if(str[i] == '|'){
+	    *pipeFlag = 0;
+	    break;
+	}
+	i++;
+    }
 }
 
 void doExit(char str[]){
