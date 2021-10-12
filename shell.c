@@ -122,6 +122,7 @@ void trim_str(char str[]){
     int index = 0;
     int x;
     int i;
+    int length = 0;
     
     while(str[index+1] != '\0'){
 	index++;
@@ -137,13 +138,17 @@ void trim_str(char str[]){
     while(str[index] == ' '){
 	index++;
     }
+
+    while(str[length] != '\0'){
+	length++;
+    }
     
     for(x = 0; x < index; x++){
-	i = 0;
-	while(str[i] != '\0'){
-	    str[i-1] = str[i];
-	    i++;
+	
+	for(i = 0; i < length; i++){
+	    str[i] = str[i+1];
 	}
+	length--;
     }
 }
 
