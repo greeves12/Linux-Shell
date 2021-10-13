@@ -38,8 +38,9 @@ int main(){
 	if(pipeFlag == 1){
 	    pid = fork();
 	    if(pid == 0){
+		trim_str(str);
 		remove_spaces(str,argv);
-	    
+		
 		if(execvp(argv[0], argv) < 0){
 		    printf("Unknown command\n");
 		    _exit(1);
@@ -62,7 +63,10 @@ int main(){
 		close(pipefd[READ_END]);
 		dup2(pipefd[WRITE_END], 1);
 		remove_spaces(pipeStr, argv);
-		execvp(argv[0], argv);	
+		if(execvp(argv[0], argv) < 0){
+		    printf("Unknown command\n");
+                    _exit(1);
+		}
 	    }
 
 	    cleanUp(argv);
@@ -76,7 +80,11 @@ int main(){
 		close(pipefd[WRITE_END]);
 		dup2(pipefd[READ_END],0);
 		remove_spaces(pipeStr,argv);
-		execvp(argv[0],argv);
+
+		if(execvp(argv[0],argv) < 0){
+		    printf("Unknown command\n");
+                    _exit(1);
+		}
 	    }
 
 	    close(pipefd[READ_END]);
@@ -261,28 +269,4 @@ void remove_spaces(char str[], char *argv[]){
 	index++;
 	argIndex++;
     }
-
-//    print_out(argv[0]);
-//    print_out(argv[1]);
-    
-//    printf("%d",arguments);
-    
-/*    argv[0] = malloc(10);
-    argv[1] = malloc(10);
-    
-    argv[0][0] = 'h';
-    argv[0][1] = '\0';
-    argv[1][0] = 't';
-    argv[1][1] = '\0';
-    print_out(argv[0]);
-    print_out(argv[1]);
-    free(argv[0]);
-    free(argv[1]);*/
-    /*
-    argv[0] = "/bin/ls";
-    argv[1] = "-al";
-    argv[2] = NULL;
-    */
-
-
 }
