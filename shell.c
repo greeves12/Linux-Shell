@@ -2,15 +2,22 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define READ_END 0
 #define WRITE_END 1
+#define APPEND 8
+#define OUTREDIR 4
+#define INREDIR 1
+#define ERRREDIR 2
 
 void clearBuffer(char str[]);
 void print_out(char str[]);
-void remove_enter(char str[], int *bgFlag, int *pipeFlag);
+void remove_enter(char str[], int *bgFlag, int *pipeFlag, char *redirFlag);
 void remove_spaces(char str[], char *argv[]);
+void redirectHandling(char *redirFlag, const char* tokens[], int tokenCount);
 void doExit(char str[]);
+int strcmp(const char* string1, const char* string2);
 void cleanUp(char *argv[]);
 void split_pipe(char str[], char newStr[], int arg);
 void trim_str(char str[]);
@@ -21,8 +28,9 @@ int main(){
     pid_t pid, pid2;
     int status;
     char *argv[10] = {};
-    int bgFlag = 1;
-    int pipeFlag = 1;
+    int bgFlag = 0;
+    int pipeFlag = 0;
+    char redirFlag = 0;
     int pipefd[2];
 
     
@@ -33,9 +41,9 @@ int main(){
 	fgets(str, 256,stdin);
 	doExit(str);
 
-	remove_enter(str, &bgFlag, &pipeFlag);
+	remove_enter(str, &bgFlag, &pipeFlag, &redirFlag);
 
-	if(pipeFlag == 1){
+	if(!pipeFlag){
 	    pid = fork();
 	    if(pid == 0){
 		trim_str(str);
@@ -47,11 +55,11 @@ int main(){
 		}
 		cleanUp(argv);
 	    }
-	    if(bgFlag == 1){
+	    if(!bgFlag){
 		waitpid(pid, &status,0);
 	    }
 
-	    bgFlag = 1;
+	    bgFlag = 0;
 	}else{	    
 
 	    pipe(pipefd);
@@ -89,13 +97,13 @@ int main(){
 
 	    close(pipefd[READ_END]);
 
-	    if(bgFlag == 1){
+	    if(!bgFlag){
 		waitpid(pid, &status,0);
 		waitpid(pid2,&status,0);
 	    }
 
-	    bgFlag = 1;
-	    pipeFlag = 1;
+	    bgFlag = 0;
+	    pipeFlag = 0;
 	}
     }
 
@@ -104,8 +112,7 @@ int main(){
 
 void split_pipe(char str[], char newStr[], int arg){
     int i = 0;
-    int x = 0;
-    
+    int x = 0;    
     if(arg == 0){
 	while(str[i] != '|'){
 	    newStr[i] = str[i];
@@ -189,15 +196,16 @@ void print_out(char str[]){
     printf("%d",i);
 }
 
-void remove_enter(char str[], int *bgFlag, int *pipeFlag){
+void remove_enter(char str[], int *bgFlag, int *pipeFlag, char *redirFlag){
     int i = 0;
-
+    *redirFlag = 0;
+    
     while(str[i] != '\n'){
 	i++;
     }
 
     if(str[i-1] == '&'){
-	*bgFlag = 0;
+	*bgFlag = 1;
 	str[i-1] = '\0';
     }
     
@@ -206,32 +214,126 @@ void remove_enter(char str[], int *bgFlag, int *pipeFlag){
     i = 0;
     while(str[i] != '\0'){
 	if(str[i] == '|'){
-	    *pipeFlag = 0;
+	    *pipeFlag = 1;
 	    break;
 	}
+	if(str[i] == '<'){
+	    *redirFlag = INREDIR;
+	}
+	if(str[i] == '>'){
+	    if(str[i-1] == '2'){
+		*redirFlag |= ERRREDIR;
+	    }
+	    else{
+		*redirFlag |= OUTREDIR;
+	    }
+	    if(str[i+1] == '>'){
+		*redirFlag |= APPEND;
+		i++;
+	    }
+	}/* end of '>' if */
 	i++;
     }
 }
-
-void doExit(char str[]){
-    int flag = 0;
-    int index = 0;
-    char exitStr[] = {"exit"};
+/* 0000 0000  input: 0000 0001  std err: 0000 0010  output: 0000 0100  output(append): 0000 1100 */
+/* you should define these later :) */
+void redirectHandling(char *redirFlag, const char* tokens[], int tokenCount){
+    int iFile = -1;
+    int oFile = -1;
+    int eFile = -1;
+    int flags = O_CREAT;
     
-    while(str[index] != '\0' && exitStr[index] != '\0'){
-	if(str[index] != exitStr[index]){
-	    flag = 1;
-	    break;
+    if(*redirFlag & INREDIR){ /*input redirect*/
+	iFile = open(*tokens, (flags | O_RDONLY));
+    }
+
+    if(*redirFlag & 14){/* output redirect */
+	flags |= O_WRONLY;
+	if(!(*redirFlag & ERRREDIR)){ /*no err redirect*/
+	    if(*redirFlag & APPEND){
+		flags |= O_APPEND;
+	    }
+	    oFile = open(tokens[tokenCount], flags);
+	}/*end err redir check*/
+	
+	if(strcmp(tokens[tokenCount], "2>&1")){
+	    if (*redirFlag & APPEND){
+		flags |= O_APPEND;
+	    }
+	    oFile = open(tokens[tokenCount-1], flags);
+	    eFile = oFile;
 	}
-	index++;
-    }
+	
+	else if(tokens[tokenCount-1][0] == '2'){
+	    if(!*redirFlag & APPEND){
+		eFile = open(tokens[tokenCount], flags);
+		oFile = open(tokens[tokenCount-2], flags);
+	    }
+	    else if(tokens[tokenCount-1][2] == '>'){
+		eFile = open(tokens[tokenCount], flags | O_APPEND);
+		if((tokens[tokenCount-3][1] == '>' && tokens[tokenCount-3][0] == '>')
+		   || tokens[tokenCount-3][2] == '>'){
+		    oFile = open(tokens[tokenCount-2], flags | O_APPEND);
+		}
+		else{
+		    oFile = open(tokens[tokenCount - 2], flags);
+		}
+	    }
+	    else{
+		eFile = open(tokens[tokenCount], flags);
+		oFile = open(tokens[tokenCount - 2], flags | O_APPEND);
+	    }
+	}
+	else{
+	    if(!*redirFlag & APPEND){
+		oFile = open(tokens[tokenCount], flags);
+		eFile = open(tokens[tokenCount-2], flags);
+	    }
+	    else if((tokens[tokenCount-1][1] == '>' && tokens[tokenCount-1][0] == '>')
+		    || tokens[tokenCount-1][2] == '>'){
+		
+		oFile = open(tokens[tokenCount], flags | O_APPEND);
+		if(tokens[tokenCount-3][2] == '>'){
+		    eFile = open(tokens[tokenCount-2], flags | O_APPEND);
+		}
+		else{
+		    eFile = open(tokens[tokenCount - 2], flags);
+		}
+	    }
+	    else{
+		oFile = open(tokens[tokenCount], flags);
+		eFile = open(tokens[tokenCount - 2], flags | O_APPEND);
+	    }
+	}/*end of "diff file" else */
+    }/* end of 14 if*/
     
-    if(flag == 0){
-	_exit(0);
-    }
+    if(iFile != -1)
+	dup2(iFile ,0);
+    if(oFile != -1)
+	dup2(oFile ,1);
+    if(eFile != -1)
+	dup2(eFile ,2);
 
+    
+    return;
 }
 
+void doExit(char str[]){
+    
+    if(strcmp(str, "exit")){
+	_exit(0);
+    }
+}
+
+int strcmp(const char* string1, const char* string2){
+    int i = 0;
+    while(string1[i] == string2[i]){
+	if(string1[i] =='\0' && string2[i] == '\0')
+	    return 1;
+	i++;
+    }
+    return 0;
+}
 void remove_spaces(char str[], char *argv[]){
     int arguments = 0;
     int index = 0;
