@@ -1,4 +1,8 @@
-#include <stdio.h>
+/*---------------------------------
+Name: Tate Greeves & Jarred Evans
+File: shell.c
+-----------------------------------*/
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -12,7 +16,6 @@
 #define ERRREDIR 2
 
 void clearBuffer(char str[]);
-void print_out(char str[]);
 void remove_enter(char str[], int *bgFlag, int *pipeFlag, char *redirFlag);
 void remove_spaces(char str[], char *argv[]);
 void redirectHandling(char *redirFlag, const char* tokens[], int tokenCount);
@@ -21,6 +24,8 @@ int strcmp(const char* string1, const char* string2);
 void cleanUp(char *argv[]);
 void split_pipe(char str[], char newStr[], int arg);
 void trim_str(char str[]);
+void get_input(char str[]);
+void print_output(char str[]);
 
 int main(){
     char str[256];
@@ -37,8 +42,8 @@ int main(){
     while(1){
 	clearBuffer(str);
 	clearBuffer(pipeStr);
-	printf("mysh$ ");
-	fgets(str, 256,stdin);
+	print_output("mysh$ ");
+	get_input(str);
 	doExit(str);
 
 	remove_enter(str, &bgFlag, &pipeFlag, &redirFlag);
@@ -50,7 +55,7 @@ int main(){
 		remove_spaces(str,argv);
 		
 		if(execvp(argv[0], argv) < 0){
-		    printf("Unknown command\n");
+		    print_output("Unknown command\n");
 		    _exit(1);
 		}
 		cleanUp(argv);
@@ -72,7 +77,7 @@ int main(){
 		dup2(pipefd[WRITE_END], 1);
 		remove_spaces(pipeStr, argv);
 		if(execvp(argv[0], argv) < 0){
-		    printf("Unknown command\n");
+		    print_output("Unknown command\n");
                     _exit(1);
 		}
 	    }
@@ -90,7 +95,7 @@ int main(){
 		remove_spaces(pipeStr,argv);
 
 		if(execvp(argv[0],argv) < 0){
-		    printf("Unknown command\n");
+		    print_output("Unknown command\n");
                     _exit(1);
 		}
 	    }
@@ -106,10 +111,54 @@ int main(){
 	    pipeFlag = 0;
 	}
     }
-
+    
     return 0;
 }
 
+/*---------------------------------------------------------------------
+name: print_output
+purpose: to print out an array of characters to standard output using
+         the write system call.
+input: str - an array of characters
+return: does not return any values
+-----------------------------------------------------------------------*/
+void print_output(char str[]){
+    int size = 0;
+
+    while(str[size] != '\0'){
+	size++;
+    }
+
+   
+    write(1, str, size);
+}
+
+/*----------------------------------------------------------------------------
+name: get_input
+purpose: to get user input from the user from standard input (character array)
+input: str - an array of characters
+return: does not return
+-----------------------------------------------------------------------------*/
+void get_input(char str[]){
+    int bytes;
+       
+    bytes = read(0, str, 256);
+
+    str[bytes] = '\0';
+}
+
+/*---------------------------------------------------------------------------
+name: split_pipe
+purpose: to split the commands at the pipe |. Ex: ls -al | wc -l
+         where using this function ls -al would be command #1 and wc -l would
+         be command 2.
+input: str - an array of characters
+       newStr - the new array of characters the command should be copied to
+       arg - 0 to grab the command before pipe
+             1 to grab the command after pipe.
+
+return: function does not return anything.
+-----------------------------------------------------------------------------*/
 void split_pipe(char str[], char newStr[], int arg){
     int i = 0;
     int x = 0;    
@@ -133,6 +182,13 @@ void split_pipe(char str[], char newStr[], int arg){
     }
 }
 
+/*-----------------------------------------------------------------------
+name: trim_str
+purpose: to remove white spaces before the string and after the string
+input: str - an array of characters
+
+return: does not return anything.
+-------------------------------------------------------------------------*/
 void trim_str(char str[]){
     int index = 0;
     int x;
@@ -167,6 +223,15 @@ void trim_str(char str[]){
     }
 }
 
+
+/*---------------------------------------------------------------------
+name: clearBuffer
+purpose: to clear an array by setting every index to null terminator
+         to a max array of 256.
+input: str - the array of characters
+
+return: function does not return anything.
+----------------------------------------------------------------------*/
 void clearBuffer(char str[]){
     int index;
 
@@ -176,6 +241,13 @@ void clearBuffer(char str[]){
    
 }
 
+/*------------------------------------------------
+name: cleanUp
+purpose: to free allocated memory
+input: arg - the pointer to an array of characters
+
+return: function does not return anything.
+--------------------------------------------------*/
 void cleanUp(char *arg[]){
     int index = 0;
 
@@ -185,17 +257,18 @@ void cleanUp(char *arg[]){
     }
 }
 
-void print_out(char str[]){
-    int i = 0;
-
-    while(str[i] != '\0'){
-	printf("%c", str[i]);
-	i++;
-    }
-
-    printf("%d",i);
-}
-
+/*---------------------------------------------------------------------------
+name: remove_enter
+purpose: to remove the \n character from the array as well as to
+         validate the command arguments such as |, >, <, &.
+input: str - array of characters
+       bgFlag - pointer to an integer that represents if the command
+                should be a background process
+       pipeFlag - pointer to an integer that represents if the command should
+                  be piped
+       redirFlag - pointer to a char that represents if the command should
+                   be handled as a redirection. 
+-----------------------------------------------------------------------------*/
 void remove_enter(char str[], int *bgFlag, int *pipeFlag, char *redirFlag){
     int i = 0;
     *redirFlag = 0;
@@ -318,13 +391,28 @@ void redirectHandling(char *redirFlag, const char* tokens[], int tokenCount){
     return;
 }
 
+/*----------------------------------------------------
+name: doExit
+purpose: to exit the shell if the user inputs exit
+input: str - an array of characters
+------------------------------------------------------*/
 void doExit(char str[]){
     
-    if(strcmp(str, "exit")){
+    if(strcmp(str, "exit\n")){
 	_exit(0);
     }
 }
 
+/*-------------------------------------------------------------------------
+name: strcmp
+purpose: to copy a character array to another character array
+input: string1 - the pointer to a character array to be copied
+       string2 - the pointer to a character array that is the destination
+
+return: function returns an integer 
+        1 if the copy was sucessful
+        0 if the copy was unsucessful
+---------------------------------------------------------------------------*/
 int strcmp(const char* string1, const char* string2){
     int i = 0;
     while(string1[i] == string2[i]){
@@ -334,6 +422,14 @@ int strcmp(const char* string1, const char* string2){
     }
     return 0;
 }
+
+/*-------------------------------------------------------------------------
+name: remove_spaces
+purpose: to separate and load the command arguments into the argument array
+input: str - the character array
+       argv - the pointer to the character array that holds the arguments
+
+----------------------------------------------------------------------------*/
 void remove_spaces(char str[], char *argv[]){
     int arguments = 0;
     int index = 0;
