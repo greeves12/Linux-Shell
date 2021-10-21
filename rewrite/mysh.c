@@ -131,14 +131,16 @@ int child(char str[]){
 	str[pIndex] = '\0';
 	
 	pid1 = fork();
-	pid2 = fork();
+//	pid2 = fork();
 	
 	if (pid1 == 0){ // left half of pipe
 	    close(pipefd[READ_END]);
 	    dup2(pipefd[WRITE_END], 1);
 	    child(str);
 	}
-       
+
+	close(pipefd[WRITE_END]);
+	pid2 = fork();
 	if (pid2 == 0){ // right half of pipe
 	    close(pipefd[WRITE_END]);
 	    dup2(pipefd[READ_END], 0);
