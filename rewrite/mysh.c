@@ -15,21 +15,21 @@
 #define WRITE_END 1
 
 //global list of io redirect symbols
-string const redirSymbols[9] = {
+string const redirSymbols[8] = {
     "<",
-    ">",
-    "2>",
-    "1>",
-    "2>>",
     "1>>",
-    "2>&1",
+    "2>>",
     ">>",
+    "2>&1",
+    "1>",
+    "2>",
+    ">"
 };
 
 char findBgFlag(char str[], int length);
 int child(char str[]);
 int ioRedirectFC(char str[], string paths[]);
-
+int openFile(char path[], char mode);
 
 int main(){
     char input[256];
@@ -50,20 +50,22 @@ int main(){
 	    pid = fork();
 	    if(pid == 0){ // child process
 		child(input);
-	    }
+	}
 	    if(!bgFlag)
 	    waitpid(pid, &childStatus, 0);
 /*	    tFlag = ioRedirectFC(input,argv);
 	    if(tFlag){
 		for(int i = 0; i < 10 && argv[i] != NULL; i++){
-		    write(STDOUT, argv[i], 15);
+		    tFlag = argv[i][0] + 48;
+		    write(STDOUT, &tFlag , 1);
+		    write(STDOUT, &argv[i][1], 15);
 		    write(STDOUT, "\n", 1);
 		}
 	    }
 	    else{
 		write(STDOUT,"io redirect symbol search failed. none detected.", 48);
 		write(STDOUT, "\n", 1);
-		}*/
+	    }*/
 	}
     }
     return 0;
@@ -123,6 +125,8 @@ int child(char str[]){
     int tokens;
     string tokList[10];
     int childStatus;
+    int fd[2];
+    int cmd;
 
     pIndex = pipeCheck(str);
 
@@ -150,11 +154,40 @@ int child(char str[]){
 	waitpid(pid2, &childStatus, 0);
     }
     else{ //no pipe
-	
+	if(!ioRedirectFC(str, tokList)){
 	tokens = tokenize(str, tokList);
+	}
+	else{
+	    int j = 0;
+	    int flag;
+	    fd[j] = -1;
+	    for(int i = 0; tokList[i] != NULL; i++){ //for all but the command, trim, open file, and dup2 the io
+		if(tokList[i][0]){
+		    flag = tokList[i][0];
+		    tokenize(&tokList[i][1], &tokList[i]);
+		    fd[j] = openFile(tokList[i], flag);
+		    if(fd[j] != -1){
+			if(tokList[i][0] & 1)
+			    dup2(fd[j], 1);
+			else if(tokList[i][0] & 2)
+			    dup2(fd[j], 0);
+			else
+			    dup2(fd[j], 2);
+		    }
+		    j++;
+		    fd[j] = -1;
+		}
+		else
+		    cmd = i;
+	    }
+	    tokens = tokenize(&tokList[cmd][1], tokList); 
+	}
 	execvp(tokList[0], tokList);
 	for(int i = 0; tokList[i] != NULL && i < 10; i++){
 	    free(tokList[i]);
+	}
+	for(int i = 0; fd[i] != -1; i++){
+	    close(fd[i]);
 	}
     }
     
@@ -203,11 +236,12 @@ int child(char str[]){
 */
 int ioRedirectFC(char str[], string paths[]){
     int prevIndex = 0;
-    int currIndex = 0;
+    int currIndex;
     int vIndex = -1;
     int currPath = 0;
     char temp;
     int sIndex;
+    char rFlag;
     
     currIndex = strcmp_p(str, redirSymbols[0]);
     if(currIndex >= 0){
@@ -219,48 +253,49 @@ int ioRedirectFC(char str[], string paths[]){
 	str[currIndex] = temp;
 	currPath++;
 	prevIndex = currIndex + 1;
+	currIndex = -1;
     }
-    write(STDOUT, &temp, 1);
-    write(STDOUT, "\n", 1);
+    
+    paths[currPath] = malloc(200);
+    paths[currPath][0] = 0;
+	
+
     for(int i = 0; i < 2 && vIndex < 0; i++){
-	vIndex = strcmp_p(&str[prevIndex], redirSymbols[1]) - 1;
+	vIndex = strcmp_p(&str[prevIndex], redirSymbols[7]);
 	if(vIndex >= 0){ // found a redirect symbol
-	    paths[currPath] = malloc(200);
-	    for(sIndex = 2; sIndex < 8 && currIndex < 0; sIndex++){
+	    paths[currPath+1] = malloc(200);
+	    vIndex += prevIndex - 1;
+	    for(sIndex = 0; sIndex < 8 && currIndex < 0;){
+		sIndex++;
 		currIndex = strcmp_p(&str[vIndex], redirSymbols[sIndex]);
 	    }
-	    if(sIndex == 8)
-		sIndex = 1;
-		currIndex = strcmp_p(&str[vIndex], redirSymbols[sIndex]);
 	    if(sIndex%2 == 0){ // all the err redirect symbols have even indexes > 0
-		paths[currPath][0] = ERR_R;
-		if(sIndex == 4)
-		    paths[currPath][0] |= APP_R;
+		rFlag = ERR_R;
+		if(sIndex == 2)
+		    rFlag |= APP_R;
 	    }
 	    else{ // output redirect symbols have odd indexes > 0
-		paths[currPath][0] = OUT_R;
-		if(sIndex > 3)
-		    paths[currPath][0] |= APP_R;
+		rFlag = OUT_R;
+		if(sIndex != 5)
+		    rFlag |= APP_R;
 	    }
 	    temp = str[vIndex + currIndex];
 	    str[vIndex+currIndex] = '\0';
 	    mstrcpy(&str[prevIndex], &paths[currPath][1], 200);
 	    str[vIndex + currIndex] = temp;
 	    currPath++;
-	    prevIndex = vIndex + currIndex + mstrlen(redirSymbols[sIndex]);
+	    prevIndex = vIndex + currIndex + 1 + mstrlen(redirSymbols[sIndex]);
 	}
     }
 
     if(prevIndex == 0){
+	free(paths[currPath]);
+	paths[currPath] = NULL;
 	return 0;
-    }
-    else if(sIndex%2 == 0){
-	paths[currPath] = malloc(200);
-	paths[currPath][0] = ERR_R;
     }
     else{
 	paths[currPath] = malloc(200);
-	paths[currPath][0] = OUT_R;
+	paths[currPath][0] = rFlag;
     }
     mstrcpy(&str[prevIndex], &paths[currPath][1], 200);
     paths[currPath+1] = NULL;
@@ -268,6 +303,26 @@ int ioRedirectFC(char str[], string paths[]){
     return 1;
 }
 
+
+
+
+int openFile(char path[], char mode){
+    int flags;
+    int perms = S_IWUSR | S_IRUSR;
+    int fd = -1;
+    if(path != NULL){    
+	if(mode & 1)
+	    flags |= O_RDONLY;
+	else{
+	    flags |= O_WRONLY | O_CREAT;
+	    if(mode & 8){
+	    flags |= O_APPEND;
+	    }
+	}
+	fd = open(path, flags, perms);
+    }
+    return fd;
+}
 
 
 

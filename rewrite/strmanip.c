@@ -41,7 +41,7 @@ int tokenize(char str[], string argv[]){
 	    }
 	    argv[tokens] = malloc(200);
 	    mstrcpy(&str[first], argv[tokens], 200);
-	    argv[tokens+1] = NULL;
+//	    argv[tokens+1] = NULL;
 	}
 	else
 	    index++;
@@ -62,15 +62,12 @@ int pipeCheck(char str[]){
 
 int strcmp_p(char str1[], char str2[]){
     int j = 0;
-    int start;
     
     for(int i = 0; str1[i] != '\0'; i++){
-	while(str1[i] == str2[j] && str1[i] != '\0'){
-	    start = i;
+	while(str1[i+j] == str2[j]){
 	    j++;
-	    i++;
 	    if(str2[j] == '\0')
-		return start;
+		return i;
 	}
 	j = 0;
     }
@@ -78,7 +75,7 @@ int strcmp_p(char str1[], char str2[]){
 }
 
 int mstrlen(char str[]){
-    int length = -1;
+    int length = 0;
 
     while(str[length] != '\0'){
 	length++;
