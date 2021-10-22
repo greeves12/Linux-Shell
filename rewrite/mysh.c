@@ -36,6 +36,7 @@ void doExit(char str[]);
 
 int main(){
     char input[256];
+    string argv[10];
     int length;
     char bgFlag = 0;
     int pid;
