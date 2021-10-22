@@ -189,20 +189,25 @@ int child(char str[], int bgFlag){
 	    for(int i = 0; tokList[i] != NULL; i++){ //for all but the command, trim, open file, and dup2 the io
 		if(tokList[i][0]){
 		    flag = tokList[i][0];
-		    tokenize(&tokList[i][1], &tokList[i]);
-		    fd[j] = openFile(tokList[i], flag);
-		    if(fd[j] != -1){
-			if(flag & 1)
-			    dup2(fd[j], 0);
-			else if(flag & 2)
-			    dup2(fd[j], 1);
-			else
-			    dup2(fd[j], 2);
+		    if(flag != 6){
+			tokenize(&tokList[i][1], &tokList[i]);
+			fd[j] = openFile(tokList[i], flag);
+			if(fd[j] != -1){
+			    if(flag & 1)
+				dup2(fd[j], 0);
+			    else if(flag & 2)
+				dup2(fd[j], 1);
+			    else
+				dup2(fd[j], 2);
+			}
+			else{
+			    write(2, "Failed to open ", 15);
+			    perror(tokList[i]);
+			    _exit(1);
+			}
 		    }
 		    else{
-			print_output("Failed to open ");
-			perror(tokList[i]);
-			_exit(1);
+			dup2(1, 2); //duplicates the current out fd into err fd. only happens for flag 6 -- 2>&1
 		    }
 		    j++;
 		    fd[j] = -1;
@@ -215,7 +220,7 @@ int child(char str[], int bgFlag){
 	}
 	
 	if(execvp(tokList[0], tokList) < 0){
-	    print_output("Command failure, ");
+	    write(2, "Command failure, ", 18);
 	    perror(tokList[0]);
 	    _exit(1);
 	}
@@ -309,10 +314,12 @@ int ioRedirectFC(char str[], string paths[]){
 		rFlag = ERR_R;
 		if(sIndex == 2)
 		    rFlag |= APP_R;
+		else if(sIndex == 4)
+		    rFlag |= OUT_R;
 	    }
 	    else{ // output redirect symbols have odd indexes > 0
 		rFlag = OUT_R;
-		if(sIndex != 5)
+		if(sIndex < 5)
 		    rFlag |= APP_R;
 	    }
 	    temp = str[vIndex + currIndex];
@@ -320,7 +327,7 @@ int ioRedirectFC(char str[], string paths[]){
 	    mstrcpy(&str[prevIndex], &paths[currPath][1], 200);
 	    str[vIndex + currIndex] = temp;
 	    currPath++;
-	    prevIndex = vIndex + currIndex + 1 + mstrlen(redirSymbols[sIndex]);
+	    prevIndex = vIndex + currIndex + mstrlen(redirSymbols[sIndex]);
 	}
     }
 
