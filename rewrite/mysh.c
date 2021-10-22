@@ -33,6 +33,7 @@ int ioRedirectFC(char str[], string paths[]);
 int openFile(char path[], char mode);
 void print_output(char str[]);
 void doExit(char str[]);
+void freeAll(string list[], int size);
 
 
 int main(){
@@ -191,9 +192,9 @@ int child(char str[], int bgFlag){
 		    tokenize(&tokList[i][1], &tokList[i]);
 		    fd[j] = openFile(tokList[i], flag);
 		    if(fd[j] != -1){
-			if(tokList[i][0] & 1)
+			if(flag & 1)
 			    dup2(fd[j], 0);
-			else if(tokList[i][0] & 2)
+			else if(flag & 2)
 			    dup2(fd[j], 1);
 			else
 			    dup2(fd[j], 2);
@@ -209,17 +210,18 @@ int child(char str[], int bgFlag){
 		else
 		    cmd = i;
 	    }
-	    tokens = tokenize(&tokList[cmd][1], tokList); 
+	    tokens = tokenize(&tokList[cmd][1], tokList);
+	    freeAll(&tokList[tokens+1], (9-tokens));
 	}
 	
 	if(execvp(tokList[0], tokList) < 0){
-	    perror("Command failure");
+	    print_output("Command failure, ");
+	    perror(tokList[0]);
 	    _exit(1);
 	}
 
-	for(int i = 0; tokList[i] != NULL && i < 10; i++){
-	    free(tokList[i]);
-	}
+	freeAll(tokList, 10);
+	
 	for(int i = 0; fd[i] != -1; i++){
 	    close(fd[i]);
 	}
@@ -357,7 +359,7 @@ int openFile(char path[], char mode){
     int perms = S_IWUSR | S_IRUSR;
     int fd = -1;
     if(path != NULL){    
-	if(mode & 1)
+	if(mode == 1)
 	    flags = O_RDONLY;
 	else{
 	    flags = O_WRONLY | O_CREAT;
@@ -370,6 +372,22 @@ int openFile(char path[], char mode){
     return fd;
 }
 
+
+/**
+   freeAll()
+
+   frees all non-null pointers in an array of char pointers
+   assumes all pointers recieved are assigned using malloc
+
+   parameters:
+   list - the array of char pointers to be freed
+   size - the size of the array
+*/
+void freeAll(string list[], int size){
+    for(int i = 0; i < size && list[i] != NULL; i++)
+	free(list[i]);
+    list[0] = NULL;
+}
 
 
 
