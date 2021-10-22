@@ -27,32 +27,40 @@ string const redirSymbols[8] = {
 };
 
 char findBgFlag(char str[], int length);
-int child(char str[]);
+int child(char str[], int bgFlag);
 int ioRedirectFC(char str[], string paths[]);
 int openFile(char path[], char mode);
+void print_output(char str[]);
+void doExit(char str[]);
+
 
 int main(){
     char input[256];
-    string argv[10];
     int length;
     char bgFlag = 0;
     int pid;
     int childStatus;
 
-    int tFlag;
+    int tFlag; // used only to test ioredirect
 
     while(1){
-	write(STDOUT, "mysh $ ", 8);
+	print_output("mysh$ ");
 	length = read(STDIN, input, 256);
 	input[length-1] = '\0';
 	bgFlag = findBgFlag(input, length-2);
+
+	doExit(input);
 	if(bgFlag != -1){
-	    pid = fork();
-	    if(pid == 0){ // child process
-		child(input);
-	}
-	    if(!bgFlag)
-	    waitpid(pid, &childStatus, 0);
+	    if(pipeCheck(input) == -1){
+		pid = fork();
+		if(pid == 0){ // child process
+		    child(input, bgFlag);
+		}
+		if(!bgFlag)
+		    waitpid(pid, &childStatus, 0);
+	    }else{
+		child(input, bgFlag);
+	    }
 /*	    tFlag = ioRedirectFC(input,argv);
 	    if(tFlag){
 		for(int i = 0; i < 10 && argv[i] != NULL; i++){
@@ -71,6 +79,16 @@ int main(){
     return 0;
 }
 
+
+void print_output(char str[]){
+    write(1, str, mstrlen(str));
+}
+
+void doExit(char str[]){
+    if(mstrcmp(str, "exit")){
+	_exit(0);
+    }
+}
 
 /**
    findBgFlag()
@@ -117,7 +135,7 @@ char findBgFlag(char str[], int length){
    return:
    function is returning an int in case any errors are encountered. currently unused and returning 1 to mean true.
 */
-int child(char str[]){
+int child(char str[], int bgFlag){
     int pIndex;
     int pipefd[2];
     int pid1;
@@ -135,23 +153,27 @@ int child(char str[]){
 	str[pIndex] = '\0';
 	
 	pid1 = fork();
-	pid2 = fork();
 	
 	if (pid1 == 0){ // left half of pipe
 	    close(pipefd[READ_END]);
 	    dup2(pipefd[WRITE_END], 1);
-	    child(str);
+	    child(str, bgFlag);
 	}
-       
+
+	close(pipefd[WRITE_END]);
+	pid2 = fork();
+
 	if (pid2 == 0){ // right half of pipe
-	    close(pipefd[WRITE_END]);
+	    
 	    dup2(pipefd[READ_END], 0);
-	    child(&str[pIndex+2]);
+	    child(&str[pIndex+2], bgFlag);
 	}
 	
 	close(pipefd[READ_END]);
-	waitpid(pid1, &childStatus, 0);
-	waitpid(pid2, &childStatus, 0);
+	if(!bgFlag){
+	    waitpid(pid1, &childStatus, 0);
+	    waitpid(pid2, &childStatus, 0);
+	}
     }
     else{ //no pipe
 	if(!ioRedirectFC(str, tokList)){
@@ -182,7 +204,12 @@ int child(char str[]){
 	    }
 	    tokens = tokenize(&tokList[cmd][1], tokList); 
 	}
-	execvp(tokList[0], tokList);
+	
+	if(execvp(tokList[0], tokList) < 0){
+	    print_output("Unknown command\n");
+	    _exit(1);
+	}
+
 	for(int i = 0; tokList[i] != NULL && i < 10; i++){
 	    free(tokList[i]);
 	}
