@@ -36,6 +36,7 @@ void doExit(char str[]);
 
 int main(){
     char input[256];
+    string argv[10];
     int length;
     char bgFlag = 0;
     int pid;
@@ -73,7 +74,7 @@ int main(){
 	    else{
 		write(STDOUT,"io redirect symbol search failed. none detected.", 48);
 		write(STDOUT, "\n", 1);
-	    }*/
+		}*/
 	}
     }
     return 0;
@@ -190,11 +191,17 @@ int child(char str[], int bgFlag){
 		    fd[j] = openFile(tokList[i], flag);
 		    if(fd[j] != -1){
 			if(tokList[i][0] & 1)
-			    dup2(fd[j], 1);
+			dup2(fd[j], 1);
 			else if(tokList[i][0] & 2)
 			    dup2(fd[j], 0);
 			else
 			    dup2(fd[j], 2);
+		    }
+		    else{
+			print_output("Failed to open ");
+			print_output(tokList[i]);
+			print_output("\n");
+			_exit(1);
 		    }
 		    j++;
 		    fd[j] = -1;
@@ -331,8 +338,20 @@ int ioRedirectFC(char str[], string paths[]){
 }
 
 
+/**
+   openFile()
 
+   opens a file at specified path. if no file exists with that name one will be created with user privilleges.
 
+   parameters:
+   path - a string containing the path of the file to be opened.
+   mode - an 8 bit number with the first bit set if the file should be opened in read-only mode, the second or 
+          third bit set if the file is to be opened in write-only mode, and the fourth bit set if the file 
+	  should be opened in write-only + append mode. 
+   return:
+   the file descriptor for the newly opened file. if any error was encountered such that the file could not be 
+   opened, -1 will be returned.
+*/
 int openFile(char path[], char mode){
     int flags;
     int perms = S_IWUSR | S_IRUSR;
