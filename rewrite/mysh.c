@@ -1,7 +1,8 @@
 #include <fcntl.h>
 #include "strmanip.h"
 #include <sys/wait.h>
-
+#include <errno.h>
+#include <stdio.h>
 
 //redirect signifiers
 #define IN_R  1
@@ -191,16 +192,15 @@ int child(char str[], int bgFlag){
 		    fd[j] = openFile(tokList[i], flag);
 		    if(fd[j] != -1){
 			if(tokList[i][0] & 1)
-			dup2(fd[j], 1);
-			else if(tokList[i][0] & 2)
 			    dup2(fd[j], 0);
+			else if(tokList[i][0] & 2)
+			    dup2(fd[j], 1);
 			else
 			    dup2(fd[j], 2);
 		    }
 		    else{
 			print_output("Failed to open ");
-			print_output(tokList[i]);
-			print_output("\n");
+			perror(tokList[i]);
 			_exit(1);
 		    }
 		    j++;
@@ -213,7 +213,7 @@ int child(char str[], int bgFlag){
 	}
 	
 	if(execvp(tokList[0], tokList) < 0){
-	    print_output("Unknown command\n");
+	    perror("Command failure");
 	    _exit(1);
 	}
 
@@ -358,11 +358,11 @@ int openFile(char path[], char mode){
     int fd = -1;
     if(path != NULL){    
 	if(mode & 1)
-	    flags |= O_RDONLY;
+	    flags = O_RDONLY;
 	else{
-	    flags |= O_WRONLY | O_CREAT;
+	    flags = O_WRONLY | O_CREAT;
 	    if(mode & 8){
-	    flags |= O_APPEND;
+		flags |= O_APPEND;
 	    }
 	}
 	fd = open(path, flags, perms);
